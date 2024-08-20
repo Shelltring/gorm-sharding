@@ -439,14 +439,17 @@ func (s *Sharding) resolve(query string, args ...any) (ftQuery, stQuery, tableNa
 			stmt.FromItems = newTable
 			stmt.OrderBy = replaceOrderByTableName(stmt.OrderBy, tableName, newTable.Name.Name)
 			stQuery = stmt.String()
+			stQuery = strings.ReplaceAll(stQuery, tableName, newTable.Name.Name)
 		case *sqlparser.UpdateStatement:
 			ftQuery = stmt.String()
 			stmt.TableName = newTable
 			stQuery = stmt.String()
+			stQuery = strings.ReplaceAll(stQuery, tableName, newTable.Name.Name)
 		case *sqlparser.DeleteStatement:
 			ftQuery = stmt.String()
 			stmt.TableName = newTable
 			stQuery = stmt.String()
+			stQuery = strings.ReplaceAll(stQuery, tableName, newTable.Name.Name)
 		}
 	}
 
@@ -473,7 +476,9 @@ func (s *Sharding) insertValue(key string, names []*sqlparser.Ident, exprs []sql
 	if len(names) != len(exprs) {
 		return nil, 0, keyFind, errors.New("column names and expressions mismatch")
 	}
-
+	if len(key) == 0 {
+		return
+	}
 	for i, name := range names {
 		if name.Name == key {
 			switch expr := exprs[i].(type) {
@@ -498,6 +503,9 @@ func (s *Sharding) insertValue(key string, names []*sqlparser.Ident, exprs []sql
 }
 
 func (s *Sharding) nonInsertValue(key string, condition sqlparser.Expr, args ...any) (value any, id int64, keyFind bool, err error) {
+	if len(key) == 0 {
+		return
+	}
 	err = sqlparser.Walk(sqlparser.VisitFunc(func(node sqlparser.Node) error {
 		if n, ok := node.(*sqlparser.BinaryExpr); ok {
 			x, ok := n.X.(*sqlparser.Ident)
