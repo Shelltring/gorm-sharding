@@ -28,7 +28,7 @@ func (pool ConnPool) ExecContext(ctx context.Context, query string, args ...any)
 		curTime = time.Now()
 	)
 
-	ftQuery, stQuery, table, err := pool.sharding.resolve(query, args...)
+	ftQuery, stQuery, table, err := pool.sharding.resolve(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -63,7 +63,7 @@ func (pool ConnPool) QueryContext(ctx context.Context, query string, args ...any
 		curTime = time.Now()
 	)
 
-	_, stQuery, _, err := pool.sharding.resolve(query, args...)
+	_, stQuery, _, err := pool.sharding.resolve(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +80,7 @@ func (pool ConnPool) QueryContext(ctx context.Context, query string, args ...any
 }
 
 func (pool ConnPool) QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
-	_, query, _, _ = pool.sharding.resolve(query, args...)
+	_, query, _, _ = pool.sharding.resolve(ctx, query, args...)
 	pool.sharding.querys.Store("last_query", query)
 
 	return pool.ConnPool.QueryRowContext(ctx, query, args...)

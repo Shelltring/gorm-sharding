@@ -1,6 +1,7 @@
 package sharding
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"hash/crc32"
@@ -84,7 +85,7 @@ type Config struct {
 	// 	func(id int64) (suffix string) {
 	//		return fmt.Sprintf("_%02d", snowflake.ParseInt64(id).Node())
 	//	}
-	ShardingAlgorithmByPrimaryKey func(id int64) (suffix string)
+	ShardingAlgorithmByPrimaryKey func(id int64, ctx context.Context) (suffix string)
 
 	// PrimaryKeyGenerator specifies the primary key generate algorithm.
 	// Used only when insert and the record does not contains an id field.
@@ -211,7 +212,7 @@ func (s *Sharding) compile() error {
 
 		if c.ShardingAlgorithmByPrimaryKey == nil {
 			if c.PrimaryKeyGenerator == PKSnowflake {
-				c.ShardingAlgorithmByPrimaryKey = func(id int64) (suffix string) {
+				c.ShardingAlgorithmByPrimaryKey = func(id int64, ctx context.Context) (suffix string) {
 					return fmt.Sprintf(c.tableFormat, snowflake.ParseInt64(id).Node())
 				}
 			}
@@ -297,7 +298,7 @@ func (s *Sharding) switchConn(db *gorm.DB) {
 }
 
 // resolve split the old query to full table query and sharding table query
-func (s *Sharding) resolve(query string, args ...any) (ftQuery, stQuery, tableName string, err error) {
+func (s *Sharding) resolve(ctx context.Context, query string, args ...any) (ftQuery, stQuery, tableName string, err error) {
 	ftQuery = query
 	stQuery = query
 	if len(s.configs) == 0 {
@@ -364,7 +365,7 @@ func (s *Sharding) resolve(query string, args ...any) (ftQuery, stQuery, tableNa
 			}
 
 			var subSuffix string
-			subSuffix, err = getSuffix(value, id, keyFind, r)
+			subSuffix, err = getSuffix(value, id, keyFind, r, ctx)
 			if err != nil {
 				return
 			}
@@ -426,7 +427,7 @@ func (s *Sharding) resolve(query string, args ...any) (ftQuery, stQuery, tableNa
 			return
 		}
 
-		suffix, err = getSuffix(value, id, keyFind, r)
+		suffix, err = getSuffix(value, id, keyFind, r, ctx)
 		if err != nil {
 			return
 		}
@@ -456,7 +457,7 @@ func (s *Sharding) resolve(query string, args ...any) (ftQuery, stQuery, tableNa
 	return
 }
 
-func getSuffix(value any, id int64, keyFind bool, r Config) (suffix string, err error) {
+func getSuffix(value any, id int64, keyFind bool, r Config, ctx context.Context) (suffix string, err error) {
 	if keyFind {
 		suffix, err = r.ShardingAlgorithm(value)
 		if err != nil {
@@ -467,7 +468,7 @@ func getSuffix(value any, id int64, keyFind bool, r Config) (suffix string, err 
 			err = fmt.Errorf("there is not sharding key and ShardingAlgorithmByPrimaryKey is not configured")
 			return
 		}
-		suffix = r.ShardingAlgorithmByPrimaryKey(id)
+		suffix = r.ShardingAlgorithmByPrimaryKey(id, ctx)
 	}
 	return
 }
